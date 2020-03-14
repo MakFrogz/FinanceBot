@@ -38,29 +38,49 @@ class Bill:
 
 def create_bill(user_id):
     with shelve.open('data') as sh:
-        sh[str(user_id)] = {'payment_id': uuid.uuid4(), 'group_id': group.get_current_group(user_id)}
+        sh[str(user_id)] = {'payment_id': str(uuid.uuid4()), 'group_id': group.get_current_group(user_id),
+                            'selected': []}
 
 
 def put_data(user_id, key, val):
     with shelve.open('data') as sh:
-        sh[str(user_id)][key] = val
+        if key in sh[str(user_id)]:
+            if isinstance(sh[str(user_id)][key], list):
+                d = sh[str(user_id)]
+                d[key].append(val)
+                sh[str(user_id)] = d
+        else:
+            d = sh[str(user_id)]
+            d[key] = val
+            sh[str(user_id)] = d
 
 
-def get_data(user_id, key):
+def get_data(user_id, key=''):
     with shelve.open('data') as sh:
-        return sh[str(user_id)][key]
+        if key:
+            d = sh[str(user_id)]
+            return d[key]
+        else:
+            return sh[str(user_id)]
+
+
+def show_data(user_id):
+    with shelve.open('data') as sh:
+        print(sh[str(user_id)])
 
 
 def insert_payment(user_id):
     data = get_data(user_id)
-    db.insert_payment(data['payment_id'], user_id, data['group_id'], data['description'], data['amount'], datetime.date.today().strftime('%Y-%m-%d'))
-    bills.append(Bill(data['payment_id'], user_id, data['group_id'], data['description'], data['amount'], datetime.date.today().strftime('%Y-%m-%d')))
+    db.insert_payment(data['payment_id'], user_id, data['group_id'], data['description'], data['amount'],
+                      datetime.date.today().strftime('%Y-%m-%d'))
+    bills.append(Bill(data['payment_id'], user_id, data['group_id'], data['description'], data['amount'],
+                      datetime.date.today().strftime('%Y-%m-%d')))
 
 
-def get_data():
+def get_data_from_db():
     data = db.select_bills()
     for bill in data:
         bills.append(Bill(bill[0], bill[1], bill[2], bill[3], bill[4], bill[5]))
 
 
-get_data()
+get_data_from_db()

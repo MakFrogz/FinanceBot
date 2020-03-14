@@ -1,5 +1,6 @@
 import telebot
 import group
+import user
 
 
 def get_create_and_connection_keyboard():
@@ -25,6 +26,14 @@ def get_bills_control_keyboard():
     return markup
 
 
+def get_debts_control_keyboard():
+    markup = telebot.types.ReplyKeyboardMarkup()
+    markup.row('Мои долги')
+    markup.row('Мои должники')
+    markup.row('Подтвердить возврат средств')
+    return markup
+
+
 def get_pay_control_keyboard():
     markup = telebot.types.ReplyKeyboardMarkup()
     markup.row('Выбрать людей из списка')
@@ -44,3 +53,26 @@ def get_existing_group_keyboard(user_id):
     else:
         msg = 'Список пустой :('
         return [msg, get_create_and_connection_keyboard()]
+
+
+def get_users_keyboard(user_id, users_id):
+    markup = telebot.types.InlineKeyboardMarkup()
+    for _id in users_id:
+        if not _id == user_id:
+            obj = user.ger_user_obj(_id)
+            fullname = obj.get_first_name() + ' ' + obj.get_last_name()
+            btn = telebot.types.InlineKeyboardButton(text=fullname, callback_data='p_' + str(_id))
+            markup.row(btn)
+    apply = telebot.types.InlineKeyboardButton(text='Подтвердить', callback_data='apply')
+    markup.row(apply)
+    return markup
+
+
+def get_r_users_keyboard(users_id):
+    markup = telebot.types.InlineKeyboardMarkup()
+    for _id in users_id:
+        obj = user.ger_user_obj(_id)
+        fullname = obj.get_first_name() + ' ' + obj.get_last_name()
+        btn = telebot.types.InlineKeyboardButton(text=fullname, callback_data='r_' + str(_id))
+        markup.row(btn)
+    return markup

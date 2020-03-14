@@ -42,10 +42,10 @@ def ger_user_obj(user_id):
     return None
 
 
-def get_data():
+def get_data_from_db():
     data = db.select_users_id()
     for user in data:
         user_list.append(User(user[0], user[1], user[2]))
 
 
-get_data()
+get_data_from_db()

@@ -4,6 +4,7 @@ import keyboard
 import group
 import user
 import bill
+import debt
 
 bot = telebot.TeleBot(config.toker)
 
@@ -89,10 +90,58 @@ def process_amount(message):
         bot.register_next_step_handler(message, process_amount)
 
 
+@bot.message_handler(func=lambda message: message.text == 'Выбрать людей из списка')
+def call_select_users(message):
+    current_group = group.get_current_group(message.from_user.id)
+    users = group.get_members_by_group_id(current_group)
+    bot.send_message(message.from_user.id, 'Выберите людей из списка:', reply_markup=keyboard.get_users_keyboard(message.from_user.id, users))
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('p_'))
+def callback_select_users(call):
+    bill.put_data(call.from_user.id, 'selected', int(call.data[2:]))
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'apply')
+def callback_apply(call):
+    users = bill.get_data(call.from_user.id, 'selected')
+    users.append(call.from_user.id)
+    debt.calc_debs(call.from_user.id, users)
+    bot.send_message(call.from_user.id, 'Чек внесён!', reply_markup=keyboard.get_bills_control_keyboard())
+
+
 @bot.message_handler(func=lambda message: message.text == 'Заплатить за всех')
 def call_pay_for_all(message):
     current_group = group.get_current_group(message.from_user.id)
     users = group.get_members_by_group_id(current_group)
+    debt.calc_debs(message.from_user.id, users)
+    bot.send_message(message.from_user.id, 'Чек внесён!', reply_markup=keyboard.get_bills_control_keyboard())
+
+
+@bot.message_handler(func=lambda message: message.text == 'Задолженности')
+def call_debts(message):
+    bot.send_message(message.from_user.id, 'Выберите пунк меню:', reply_markup=keyboard.get_debts_control_keyboard())
+
+
+@bot.message_handler(func=lambda message: message.text == 'Подтвердить возврат средств')
+def call_refund(message):
+    bot.send_message(message.from_user.id, 'Выберите человека из списка:', reply_markup=keyboard.get_r_users_keyboard(debt.get_debtors(message.from_user.id)))
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('r_'))
+def callback_refund(call):
+    debt.add_debtor(call.from_user.id, int(call.data[2:]))
+    bot.send_message(call.from_user.id, 'Сколько Вам вернули?')
+    bot.register_next_step_handler(call.message, process_refund)
+
+
+def process_refund(message):
+    try:
+        debt.update_debts(message.from_user.id, round(float(message.text.replace(',', '.')), 2))
+        bot.send_message(message.from_user.id, 'Возврат подтвержден!', reply_markup=keyboard.get_debts_control_keyboard())
+    except ValueError:
+        bot.send_message(message.from_user.id, 'Вы ввели некорректную сумму!Попробуйте ещё раз!')
+        bot.register_next_step_handler(message, process_refund)
 
 
 @bot.message_handler(func=lambda message: message.text == 'Выйти из группы')

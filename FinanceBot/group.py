@@ -69,7 +69,7 @@ def get_members_by_group_id(group_id):
     if data:
         l = []
         for obj in data:
-            l.append(obj.get_user_id)
+            l.append(obj.get_user_id())
         return l
     return []
 
