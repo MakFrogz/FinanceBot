@@ -27,8 +27,8 @@ def calc_debs(user_id, users_id):
                 db.insert_debt(bill.get_data(user_id, 'payment_id'), _id, amount)
 
 
-def get_debtors(user_id):
-    data = db.select_debtors(user_id)
+def get_debtors_for_keyboard(user_id):
+    data = db.select_debtors_for_keyboard(user_id)
     return list(map(lambda x: x[0], data))
 
 
@@ -51,3 +51,19 @@ def update_debts(user_id, amount):
         else:
             db.update_debt(debt[1] - r_amount, debt[0], debtor_id)
             break
+
+
+def get_debtors(user_id):
+    debtors = db.select_debtors(user_id)
+    msg = ''
+    for debtor in debtors:
+        msg = msg + debtor[0] + ' ' + debtor[1] + '--->' + str(debtor[2]) + '\n'
+    return msg
+
+
+def get_debts(user_id):
+    debts = db.select_user_debts(user_id)
+    msg = ''
+    for d in debts:
+        msg = msg + d[0] + ' ' + d[1] + '<---' + str(d[2]) + '\n'
+    return msg

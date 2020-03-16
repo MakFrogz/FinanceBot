@@ -59,7 +59,8 @@ def process_connect_to_new_group(message):
         else:
             group.create_group(message.text, message.from_user.id, True)
     else:
-        bot.send_message(message.from_user.id, 'Такой группы не существует!', reply_markup=keyboard.get_create_and_connection_keyboard())
+        bot.send_message(message.from_user.id, 'Такой группы не существует!',
+                         reply_markup=keyboard.get_create_and_connection_keyboard())
 
 
 @bot.message_handler(func=lambda message: message.text == 'Чеки')
@@ -118,14 +119,42 @@ def call_pay_for_all(message):
     bot.send_message(message.from_user.id, 'Чек внесён!', reply_markup=keyboard.get_bills_control_keyboard())
 
 
+@bot.message_handler(func=lambda message: message.text == 'Просмотреть чеки')
+def call_show_bills(message):
+    try:
+        msg = bill.get_bills(message.from_user.id)
+        bot.send_message(message.from_user.id, msg)
+    except telebot.apihelper.ApiException:
+        bot.send_message(message.from_user.id, 'Список чеков пуст!')
+
+
 @bot.message_handler(func=lambda message: message.text == 'Задолженности')
 def call_debts(message):
     bot.send_message(message.from_user.id, 'Выберите пунк меню:', reply_markup=keyboard.get_debts_control_keyboard())
 
 
+@bot.message_handler(func=lambda message: message.text == 'Мои должники')
+def call_my_debtors(message):
+    try:
+        msg = debt.get_debtors(message.from_user.id)
+        bot.send_message(message.from_user.id, msg)
+    except telebot.apihelper.ApiException:
+        bot.send_message(message.from_user.id, 'У Вас нет должников!')
+
+
+@bot.message_handler(func=lambda message: message.text == 'Мои долги')
+def call_my_debts(message):
+    try:
+        msg = debt.get_debts(message.from_user.id)
+        bot.send_message(message.from_user.id, msg)
+    except telebot.apihelper.ApiException:
+        bot.send_message(message.from_user.id, 'У Вас нет долгов!')
+
+
 @bot.message_handler(func=lambda message: message.text == 'Подтвердить возврат средств')
 def call_refund(message):
-    bot.send_message(message.from_user.id, 'Выберите человека из списка:', reply_markup=keyboard.get_r_users_keyboard(debt.get_debtors(message.from_user.id)))
+    bot.send_message(message.from_user.id, 'Выберите человека из списка:',
+                     reply_markup=keyboard.get_r_users_keyboard(debt.get_debtors_for_keyboard(message.from_user.id)))
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('r_'))
@@ -150,6 +179,11 @@ def call_leave_group(message):
     group.update_user_online(message.from_user.id, current_group, False)
     bot.send_message(message.from_user.id, 'Выберите пункт меню:',
                      reply_markup=keyboard.get_create_and_connection_keyboard())
+
+
+@bot.message_handler(func=lambda message: message.text == 'Назад')
+def call_back(message):
+    bot.send_message(message.from_user.id, 'Выберите пункт меню:', reply_markup=keyboard.get_main_keyboard())
 
 
 if __name__ == '__main__':

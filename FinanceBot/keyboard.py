@@ -23,6 +23,7 @@ def get_bills_control_keyboard():
     markup = telebot.types.ReplyKeyboardMarkup()
     markup.row('Внести чек')
     markup.row('Просмотреть чеки')
+    markup.row('Назад')
     return markup
 
 
@@ -31,6 +32,7 @@ def get_debts_control_keyboard():
     markup.row('Мои долги')
     markup.row('Мои должники')
     markup.row('Подтвердить возврат средств')
+    markup.row('Назад')
     return markup
 
 

@@ -2,6 +2,7 @@ import db
 import shelve
 import uuid
 import group
+import user
 import datetime
 
 bills = []
@@ -34,6 +35,11 @@ class Bill:
 
     def get_date(self):
         return self.__date
+
+    def __str__(self):
+        u = user.ger_user_obj(self.__user_id)
+        fullname = u.get_first_name() + ' ' + u.get_last_name()
+        return '{who} --> d: {description}, a: {amount}, d: {date}'.format(who=fullname, description=self.__description, amount=self.__amount, date=self.__date)
 
 
 def create_bill(user_id):
@@ -81,6 +87,15 @@ def get_data_from_db():
     data = db.select_bills()
     for bill in data:
         bills.append(Bill(bill[0], bill[1], bill[2], bill[3], bill[4], bill[5]))
+
+
+def get_bills(user_id):
+    group_id = group.get_current_group(user_id)
+    l = [bill for bill in bills if bill.get_group_id() == group_id]
+    msg = ""
+    for b in l:
+        msg = msg + str(b) + '\n'
+    return msg
 
 
 get_data_from_db()

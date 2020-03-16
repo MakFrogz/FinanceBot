@@ -47,19 +47,35 @@ def select_groups():
 
 def select_bills():
     with conn:
-        sql = 'SELECT payment_id, user_id, group_id, description, amount, date FROM payment'
+        sql = 'SELECT payment_id, user_id, group_id, description, amount, date FROM payment ORDER BY date DESC'
         return cursor.execute(sql)
 
 
 def select_debts(*args):
     with conn:
-        sql = 'SELECT debt.payment_id, debt.amount FROM debt INNER JOIN payment ON payment.payment_id = debt.payment_id WHERE payment.user_id = ? AND debt.user_id = ?'
+        sql = 'SELECT debt.payment_id, debt.amount FROM debt INNER JOIN payment ON payment.payment_id = ' \
+              'debt.payment_id WHERE payment.user_id = ? AND debt.user_id = ? '
+        return cursor.execute(sql, args).fetchall()
+
+
+def select_debtors_for_keyboard(*args):
+    with conn:
+        sql = 'SELECT debt.user_id FROM debt INNER JOIN payment ON debt.payment_id = payment.payment_id WHERE ' \
+              'payment.user_id = ? GROUP BY debt.user_id '
         return cursor.execute(sql, args).fetchall()
 
 
 def select_debtors(*args):
     with conn:
-        sql = 'SELECT debt.user_id FROM debt INNER JOIN payment ON debt.payment_id = payment.payment_id WHERE payment.user_id = ? GROUP BY debt.user_id'
+        sql = 'SELECT user.first_name, user.last_name, SUM(debt.amount) FROM user INNER JOIN debt ON user.user_id = debt.user_id ' \
+              'INNER JOIN payment ON debt.payment_id = payment.payment_id WHERE payment.user_id = ? AND debt.amount > 0 GROUP BY user.user_id'
+        return cursor.execute(sql, args).fetchall()
+
+
+def select_user_debts(*args):
+    with conn:
+        sql = 'SELECT user.first_name, user.last_name, SUM(debt.amount) FROM user INNER JOIN payment ON user.user_id = payment.user_id  ' \
+                'INNER JOIN debt ON payment.payment_id = debt.payment_id WHERE debt.user_id = ? AND debt.amount > 0 GROUP BY user.user_id'
         return cursor.execute(sql, args).fetchall()
 
 
