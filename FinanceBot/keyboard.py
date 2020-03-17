@@ -65,8 +65,11 @@ def get_users_keyboard(user_id, users_id):
             fullname = obj.get_first_name() + ' ' + obj.get_last_name()
             btn = telebot.types.InlineKeyboardButton(text=fullname, callback_data='p_' + str(_id))
             markup.row(btn)
-    apply = telebot.types.InlineKeyboardButton(text='Подтвердить', callback_data='apply')
-    markup.row(apply)
+    # apply = telebot.types.InlineKeyboardButton(text='Подтвердить', callback_data='apply')
+    # cancel = telebot.types.InlineKeyboardButton(text='Отменить', callback_data='cancel')
+    # markup.row(apply, cancel)
+    print(markup.to_dic())
+    print(markup.to_json())
     return markup
 
 
@@ -78,3 +81,13 @@ def get_r_users_keyboard(users_id):
         btn = telebot.types.InlineKeyboardButton(text=fullname, callback_data='r_' + str(_id))
         markup.row(btn)
     return markup
+
+
+def get_new_markup(old_markup, callback):
+    new_markup = old_markup
+    for i in new_markup['inline_keyboard']:
+        if i[0]['callback_data'] == callback:
+            new_markup['inline_keyboard'].remove(i)
+            break
+    new_markup['inline_keyboard'].append([{'text': 'Подтвердить', 'callback_data': 'apply'}, {'text': 'Отменить', 'callback_data': 'cancel'}])
+    return str(new_markup).replace('\'', '"')

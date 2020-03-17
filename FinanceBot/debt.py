@@ -67,3 +67,8 @@ def get_debts(user_id):
     for d in debts:
         msg = msg + d[0] + ' ' + d[1] + '<---' + str(d[2]) + '\n'
     return msg
+
+
+def get_alert(users_id, message):
+    amount = round(bill.get_data(message.from_user.id, 'amount') / len(users_id), 2)
+    return message.from_user.first_name + ' ' + message.from_user.last_name + ' заплатил за тебя сумму ' + str(amount) + '('  + bill.get_data(message.from_user.id, 'description') + ')'

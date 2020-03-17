@@ -70,6 +70,13 @@ def get_data(user_id, key=''):
             return sh[str(user_id)]
 
 
+def clear_data(user_id, key):
+    with shelve.open('data') as sh:
+        d = sh[str(user_id)]
+        d[key].clear()
+        sh[str(user_id)] = d
+
+
 def show_data(user_id):
     with shelve.open('data') as sh:
         print(sh[str(user_id)])
