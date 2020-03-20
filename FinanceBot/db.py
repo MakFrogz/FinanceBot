@@ -14,7 +14,14 @@ def insert_user(*args):
 
 def insert_group(*args):
     with conn:
-        sql = 'INSERT INTO groups(group_id, user_id, online) VALUES (?,?,?)'
+        sql = 'INSERT INTO groups(group_id, password) VALUES (?,?)'
+        cursor.execute(sql, args)
+        conn.commit()
+
+
+def insert_to_history_group(*args):
+    with conn:
+        sql = 'INSERT INTO history_groups(group_id, user_id, online) VALUES (?,?,?)'
         cursor.execute(sql, args)
         conn.commit()
 
@@ -27,21 +34,31 @@ def insert_payment(*args):
 
 
 def insert_debt(*args):
+    try:
+        with conn:
+            sql = 'INSERT INTO debt(debt_id, user_id, amount, debtor_id) VALUES (?,?,?,?)'
+            cursor.execute(sql, args)
+            conn.commit()
+    except sqlite3.IntegrityError:
+        update_debt(args[2], args[0])
+
+
+def insert_debt_to_history_debt(*args):
     with conn:
-        sql = 'INSERT INTO debt(payment_id, user_id, amount) VALUES (?,?,?)'
+        sql = 'INSERT INTO history_debt(payment_id, user_id, amount) VALUES (?,?,?)'
         cursor.execute(sql, args)
         conn.commit()
 
 
-def select_users_id():
+def select_users():
     with conn:
-        sql = 'SELECT user_id, first_name, last_name FROM user'
+        sql = 'SELECT u.user_id, u.first_name, u.last_name, h.group_id FROM user u LEFT JOIN history_groups h ON u.user_id = h.user_id AND h.online = 1'
         return cursor.execute(sql).fetchall()
 
 
 def select_groups():
     with conn:
-        sql = 'SELECT group_id, user_id, online FROM groups'
+        sql = 'SELECT h.group_id, g.password, h.user_id, h.online FROM groups g INNER JOIN history_groups h ON g.group_id = h.group_id'
         return cursor.execute(sql).fetchall()
 
 
@@ -53,15 +70,14 @@ def select_bills():
 
 def select_debts(*args):
     with conn:
-        sql = 'SELECT debt.payment_id, debt.amount FROM debt INNER JOIN payment ON payment.payment_id = ' \
-              'debt.payment_id WHERE payment.user_id = ? AND debt.user_id = ? '
-        return cursor.execute(sql, args).fetchall()
+        sql = 'SELECT amount FROM debt WHERE user_id = ? AND debtor_id = ?'
+        return cursor.execute(sql, args).fetchone()
 
 
 def select_debtors_for_keyboard(*args):
     with conn:
-        sql = 'SELECT debt.user_id FROM debt INNER JOIN payment ON debt.payment_id = payment.payment_id WHERE ' \
-              'payment.user_id = ? GROUP BY debt.user_id '
+        sql = 'SELECT h.user_id FROM history_debt h INNER JOIN payment p ON h.payment_id = p.payment_id WHERE ' \
+              'p.user_id = ? GROUP BY h.user_id '
         return cursor.execute(sql, args).fetchall()
 
 
@@ -79,15 +95,21 @@ def select_user_debts(*args):
         return cursor.execute(sql, args).fetchall()
 
 
+def select_debtors_by_payment_id(*args):
+    with conn:
+        sql = 'SELECT user_id FROM debt WHERE payment_id = ?'
+        return cursor.execute(sql, args).fetchall()
+
+
 def update_user_online(*args):
     with conn:
-        sql = 'UPDATE groups SET online = ? WHERE group_id = ? AND user_id = ?'
+        sql = 'UPDATE history_groups SET online = ? WHERE group_id = ? AND user_id = ?'
         cursor.execute(sql, args)
         conn.commit()
 
 
 def update_debt(*args):
     with conn:
-        sql = 'UPDATE debt SET amount = ? WHERE payment_id = ? AND user_id = ?'
+        sql = 'UPDATE debt SET amount = amount + ? WHERE debt_id = ?'
         cursor.execute(sql, args)
         conn.commit()

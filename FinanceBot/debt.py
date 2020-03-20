@@ -1,30 +1,57 @@
+import sqlite3
+
 import db
 import bill
+import user
+import group
 
 debtors = {}
 
 
-def calc_debs(user_id, users_id):
-    bill.show_data(user_id)
-    amount = round(bill.get_data(user_id, 'amount') / len(users_id), 2)
-    bill.insert_payment(user_id)
-    for _id in users_id:
+# def calc_debs(user_id, users_id):
+#     bill.show_data(user_id)
+#     amount = round(bill.get_data(user_id, 'amount') / len(users_id), 2)
+#     bill.insert_payment(user_id)
+#     for _id in users_id:
+#         if not _id == user_id:
+#             data = db.select_debts(_id, user_id)
+#             p_amount = amount
+#             if data:
+#                 for debt in data:
+#                     if p_amount >= debt[1]:
+#                         db.update_debt(0, debt[0], user_id)
+#                         p_amount -= debt[1]
+#                     else:
+#                         db.update_debt(debt[1] - p_amount, debt[0], user_id)
+#                         p_amount = 0
+#                         db.insert_debt(bill.get_data(user_id, 'payment_id'), _id, p_amount)
+#                         break
+#                 if p_amount > 0:
+#                     db.insert_debt(bill.get_data(user_id, 'payment_id'), _id, p_amount)
+#             else:
+#                 db.insert_debt(bill.get_data(user_id, 'payment_id'), _id, amount)
+
+def calc_debs(user_id, status):
+    group_id = user.get_current_group(user_id)
+    if status:
+        members = group.get_members_by_group_id(group_id)
+        debt_amount = round(bill.get_data(user_id, 'amount') / len(members), 2)
+    else:
+        members = bill.get_selected(user_id)
+        debt_amount = round(bill.get_data(user_id, 'amount') / (len(members) + 1), 2)
+    for _id in members:
         if not _id == user_id:
             data = db.select_debts(_id, user_id)
-            p_amount = amount
             if data:
-                for debt in data:
-                    if p_amount >= debt[1]:
-                        db.update_debt(0, debt[0], user_id)
-                        p_amount -= debt[1]
-                    else:
-                        db.update_debt(debt[1] - p_amount, debt[0], user_id)
-                        p_amount = 0
-                        break
-                if p_amount > 0:
-                    db.insert_debt(bill.get_data(user_id, 'payment_id'), _id, p_amount)
+                if data[0] >= debt_amount:
+                    db.update_debt(-debt_amount, _id - user_id)
+                else:
+                    db.update_debt(-data[0], _id - user_id)
+                    db.insert_debt(user_id - _id, user_id, debt_amount - data[0], _id)
             else:
-                db.insert_debt(bill.get_data(user_id, 'payment_id'), _id, amount)
+                db.insert_debt(user_id - _id, user_id, debt_amount, _id)
+            db.insert_debt_to_history_debt(bill.get_data(user_id, 'payment_id'), _id, debt_amount)
+    bill.insert_payment(user_id)
 
 
 def get_debtors_for_keyboard(user_id):
@@ -40,17 +67,25 @@ def get_debtor(user_id):
     return debtors[user_id]
 
 
-def update_debts(user_id, amount):
+def refund(user_id, amount):
     debtor_id = get_debtor(user_id)
-    data = db.select_debts(user_id, debtor_id)
-    r_amount = amount
-    for debt in data:
-        if r_amount >= debt[1]:
-            db.update_debt(0, debt[0], debtor_id)
-            r_amount -= debt[1]
-        else:
-            db.update_debt(debt[1] - r_amount, debt[0], debtor_id)
-            break
+    debt_amount = db.select_debts(user_id, debtor_id)[0]
+    if debt_amount - amount >= 0:
+        msg = 'Возврат подтвержден!'
+    else:
+        msg = 'Вы ввели сумму больше, чем Вам должны, но я взял нужную сумму, не беспокойтесь :)'
+        amount = debt_amount
+    create_refund_bill(user_id, amount, debtor_id)
+    db.update_debt(-amount, user_id - debtor_id)
+    db.insert_debt_to_history_debt(bill.get_data(user_id, 'payment_id'), debtor_id, - amount)
+    return msg
+
+
+def create_refund_bill(user_id, amount, debtor_id):
+    bill.create_bill(user_id)
+    bill.put_data(user_id, 'description', user.get_user_fullname(debtor_id) + '-->' + user.get_user_fullname(user_id))
+    bill.put_data(user_id, 'amount', amount)
+    bill.insert_payment(user_id)
 
 
 def get_debtors(user_id):
@@ -67,6 +102,29 @@ def get_debts(user_id):
     for d in debts:
         msg = msg + d[0] + ' ' + d[1] + '<---' + str(d[2]) + '\n'
     return msg
+
+
+def debr_recalc(payment_id, user_id):
+    bill_obj = bill.get_bill(payment_id)
+    users = db.select_debtors_by_payment_id(payment_id)
+    amount = round(bill_obj.get_amount() / len(users) + 1, 2)
+    for _id in users:
+        data = db.select_debts(_id, user_id)
+        p_amount = amount
+        if data:
+            for debt in data:
+                if p_amount >= debt[1]:
+                    db.update_debt(0, debt[0], user_id)
+                    p_amount -= debt[1]
+                else:
+                    db.update_debt(debt[1] - p_amount, debt[0], user_id)
+                    p_amount = 0
+                    db.insert_debt(bill.get_data(user_id, 'payment_id'), _id, p_amount)
+                    break
+            if p_amount > 0:
+                db.insert_debt(bill.get_data(user_id, 'payment_id'), _id, p_amount)
+        else:
+            db.update_debt(debt[1] - p_amount, debt[0], user_id)
 
 
 def get_alert(users_id, message):

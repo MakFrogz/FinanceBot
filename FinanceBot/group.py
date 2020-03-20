@@ -1,83 +1,77 @@
 import db
 import user
-group_list = []
+
+groups_dict = {}
+temp = {}
 
 
-class Group:
-
-    def __init__(self, group_id, user_id, online):
-        self.__group_id = group_id
-        self.__user_id = user_id
-        self.__online = online
-
-    def get_group(self):
-        return self.__group_id
-
-    def get_user_id(self):
-        return self.__user_id
-
-    def get_online(self):
-        return self.__online
-
-    def set_online(self, online):
-        self.__online = online
+def set_temp(user_id, key, group_id):
+    if user_id in temp:
+        temp[user_id][key] = group_id
+    else:
+        temp[user_id] = {}
+        temp[user_id][key] = group_id
 
 
-def create_group(group_id, user_id, online):
-    group_list.append(Group(group_id, user_id, online))
-    db.insert_group(group_id, user_id, online)
+def create_group(user_id):
+    group_id = temp[user_id]['group_id']
+    password = temp[user_id]['password']
+    db.insert_group(group_id, password)
+    db.insert_to_history_group(group_id, user_id, True)
+    user.set_group(user_id, group_id)
+    groups_dict[group_id] = {'password': password, 'members': [user_id]}
 
 
-def check_online_group(user_id):
-    if [group for group in group_list if group.get_user_id() == user_id and group.get_online()]:
-        return True
-    return False
+def insert_member_to_group(user_id):
+    db.insert_to_history_group(temp[user_id]['connect_group'], user_id, True)
+    add_new_member_to_group(user_id)
 
 
-def get_current_group(user_id):
-    data = [group for group in group_list if group.get_user_id() == user_id and group.get_online()]
-    if data:
-        return data[0].get_group()
-    return []
+def add_new_member_to_group(user_id):
+    group_id = temp[user_id]['connect_group']
+    user.set_group(user_id, group_id)
+    groups_dict[group_id]['members'].append(user_id)
+    print(groups_dict)
 
 
 def check_group_existing(group_id):
-    if [group for group in group_list if group.get_group() == group_id]:
-        return True
-    return False
+    return group_id in groups_dict
 
 
 def check_existing_member_in_group(user_id, group_id):
-    if [group for group in group_list if group.get_user_id() == user_id and group.get_group() == group_id]:
-        return True
-    return False
+    return user_id in groups_dict[group_id]['members']
+
+
+def check_group_password(user_id, password):
+    key = temp[user_id]['connect_group']
+    return groups_dict[key]['password'] == password
 
 
 def get_groups_by_user_id(user_id):
-    return [group for group in group_list if group.get_user_id() == user_id]
+    return [key for key in groups_dict.keys() if user_id in groups_dict[key]['members']]
 
 
 def update_user_online(user_id, group_id, online):
-    data = [group for group in group_list if group.get_user_id() == user_id and group.get_group() == group_id]
-    if data:
-        data[0].set_online(online)
-        db.update_user_online(online,group_id, user_id)
+    if group_id:
+        user.set_group(user_id, group_id)
+        db.update_user_online(online, group_id, user_id)
+    else:
+        group_id = user.get_current_group(user_id)
+        db.update_user_online(online, group_id, user_id)
+        user.set_group(user_id, None)
 
 
 def get_members_by_group_id(group_id):
-    data = [group for group in group_list if group.get_group() == group_id]
-    if data:
-        l = []
-        for obj in data:
-            l.append(obj.get_user_id())
-        return l
-    return []
+    return groups_dict[group_id]['members']
 
 
-def get_data():
+def get_data_from_db():
     data = db.select_groups()
-    for group_id, user_id, online in data:
-        group_list.append(Group(group_id, user_id, online))
+    global groups_dict
+    groups_dict = {group[0]: {'password': '', 'members': []} for group in data}
+    for group_id, password, user_id, online in data:
+        groups_dict[group_id]['password'] = password
+        groups_dict[group_id]['members'].append(user_id)
 
 
-get_data()
+get_data_from_db()
