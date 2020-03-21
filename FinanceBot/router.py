@@ -108,18 +108,18 @@ def process_amount(message):
 
 @bot.message_handler(func=lambda message: message.text == 'Выбрать людей из списка')
 def call_select_users(message):
-    bot.send_message(message.from_user.id, 'Выберите людей из списка:', reply_markup=keyboard.get_users_keyboard(message.from_user.id))
+    bot.send_message(message.from_user.id, 'Выберите людей из списка:', reply_markup=keyboard.get_users_keyboard(message.from_user.id, 'p_'))
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('p_'))
 def callback_select_users(call):
     # bill.put_data(call.from_user.id, 'selected', int(call.data[2:]))
     bill.set_selected(call.from_user.id, int(call.data[2:]))
-    markup = keyboard.get_new_markup(call.message.json['reply_markup'], call.data)
+    markup = keyboard.get_new_markup(call.message.json['reply_markup'], call.data, 'p_')
     bot.edit_message_reply_markup(call.from_user.id, call.message.message_id, reply_markup=markup)
 
 
-@bot.callback_query_handler(func=lambda call: call.data == 'apply')
+@bot.callback_query_handler(func=lambda call: call.data == 'p_apply')
 def callback_apply(call):
     debt.calc_debs(call.from_user.id, False)
     # alert = debt.get_alert(users, call)
@@ -130,11 +130,11 @@ def callback_apply(call):
     bot.send_message(call.from_user.id, 'Чек внесён!', reply_markup=keyboard.get_bills_control_keyboard())
 
 
-@bot.callback_query_handler(func=lambda call: call.data == 'cancel')
+@bot.callback_query_handler(func=lambda call: call.data == 'p_cancel')
 def callback_cancel(call):
     # bill.clear_data(call.from_user.id, 'selected')
     bill.clear_selected(call.from_user.id)
-    bot.edit_message_reply_markup(call.from_user.id, call.message.message_id, reply_markup=keyboard.get_users_keyboard(call.from_user.id))
+    bot.edit_message_reply_markup(call.from_user.id, call.message.message_id, reply_markup=keyboard.get_users_keyboard(call.from_user.id, 'p_'))
 
 
 @bot.message_handler(func=lambda message: message.text == 'Заплатить за всех')
@@ -164,7 +164,71 @@ def call_edit_bills(message):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('eb_'))
 def callback_edit_bills(call):
-    pass
+    bill.put_data(call.from_user.id, 'edit_payment_id', call.data[3:])
+    bot.send_message(call.from_user.id, 'Выберите пунк меню:', reply_markup=keyboard.get_edit_bill_keyboard())
+
+
+@bot.message_handler(func=lambda message: message.text == 'Редактировать описание')
+def call_edit_bill_description(message):
+    bot.send_message(message.from_user.id, 'Введите новое описание')
+    bot.register_next_step_handler(message, process_edit_bill_description)
+
+
+def process_edit_bill_description(message):
+    bill.put_data(message.from_user.id, 'edit_bill_description', message.text)
+    bill.update_bill_description(message.from_user.id)
+    bot.send_message(message.from_user.id, 'Выберите пунк меню:', reply_markup=keyboard.get_edit_bill_keyboard())
+
+
+@bot.message_handler(func=lambda message: message.text == 'Редактировать сумму')
+def call_edit_bill_amount(message):
+    bot.send_message(message.from_user.id, 'Введите новую сумму')
+    bot.register_next_step_handler(message, process_edit_bill_amount)
+
+
+def process_edit_bill_amount(message):
+    try:
+        amount = round(float(message.text.replace(',', '.')), 2)
+        bill.put_data(message.from_user.id, 'edit_bill_amount', amount)
+        bill.update_bill_amount(message.from_user.id)
+        bot.send_message(message.from_user.id, 'Выберите пунк меню:', reply_markup=keyboard.get_edit_bill_keyboard())
+    except ValueError:
+        bot.send_message(message.from_user.id, 'Вы ввели некорректную сумму!Попробуйте ещё раз!')
+        bot.register_next_step_handler(message, process_edit_bill_amount)
+
+
+@bot.message_handler(func=lambda message: message.text == 'Редактировать список людей')
+def call_edit_bill_users(message):
+    bill.put_data(message.from_user.id, 'e_selected', [])
+    bot.send_message(message.from_user.id, 'Выберите людей из списка:',
+                     reply_markup=keyboard.get_users_keyboard(message.from_user.id, 'e_'))
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('e_'))
+def callback_select_users(call):
+    l = bill.get_data(call.from_user.id, 'e_selected')
+    l.append(int(call.data[2:]))
+    bill.put_data(call.from_user.id, 'e_selected', l)
+    markup = keyboard.get_new_markup(call.message.json['reply_markup'], call.data, 'e_')
+    bot.edit_message_reply_markup(call.from_user.id, call.message.message_id, reply_markup=markup)
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'e_apply')
+def callback_apply(call):
+    debt.calc_debs(call.from_user.id, False)
+    # alert = debt.get_alert(users, call)
+    # for u in users:
+    #     if not u == call.from_user.id:
+    #         bot.send_message(u, alert)
+    bot.delete_message(call.from_user.id, call.message.message_id)
+    bot.send_message(call.from_user.id, 'Чек внесён!', reply_markup=keyboard.get_bills_control_keyboard())
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'e_cancel')
+def callback_cancel(call):
+    # bill.clear_data(call.from_user.id, 'selected')
+    bill.clear_selected(call.from_user.id)
+    bot.edit_message_reply_markup(call.from_user.id, call.message.message_id, reply_markup=keyboard.get_users_keyboard(call.from_user.id, 'e_'))
 
 
 @bot.message_handler(func=lambda message: message.text == 'Задолженности')
@@ -222,12 +286,6 @@ def call_leave_group(message):
 @bot.message_handler(func=lambda message: message.text == 'Назад')
 def call_back(message):
     bot.send_message(message.from_user.id, 'Выберите пункт меню:', reply_markup=keyboard.get_main_keyboard())
-
-
-bot.enable_save_next_step_handlers(delay=2)
-
-
-bot.load_next_step_handlers()
 
 
 if __name__ == '__main__':

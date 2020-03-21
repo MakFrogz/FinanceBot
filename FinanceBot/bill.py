@@ -3,6 +3,7 @@ import uuid
 import group
 import user
 import datetime
+import debt
 
 temp = {}
 
@@ -12,7 +13,11 @@ def create_bill(user_id):
 
 
 def put_data(user_id, key, val):
-    temp[user_id][key] = val
+    try:
+        temp[user_id][key] = val
+    except KeyError:
+        temp[user_id] = {}
+        temp[user_id][key] = val
 
 
 def get_data(user_id, key):
@@ -47,12 +52,15 @@ def get_bills_msg(user_id):
 
 
 def get_bills_for_edit(user_id):
-    group_id = group.get_current_group(user_id)
-    l = [[bill.get_description(), bill.get_payment_id()] for bill in bills if
-         bill.get_group_id() == group_id and bill.get_user_id() == user_id]
-    return l
+    group_id = user.get_current_group(user_id)
+    data = db.select_payments_by_user_id_and_group_id(user_id, group_id)
+    return data
 
 
-def get_bill(payment_id):
-    bill = [bill for bill in bills if bill.get_payment_id() == payment_id]
-    return bill[0]
+def update_bill_description(user_id):
+    db.update_bill_description(get_data(user_id, 'edit_bill_description'), get_data(user_id, 'edit_payment_id'))
+
+
+def update_bill_amount(user_id):
+    db.update_bill_amount(get_data(user_id, 'edit_bill_amount'), get_data(user_id, 'edit_payment_id'))
+    debt.update_debt(user_id, get_data(user_id, 'edit_bill_amount'), get_data(user_id, 'edit_payment_id'))

@@ -97,7 +97,13 @@ def select_user_debts(*args):
 
 def select_debtors_by_payment_id(*args):
     with conn:
-        sql = 'SELECT user_id FROM debt WHERE payment_id = ?'
+        sql = 'SELECT user_id, amount FROM history_debt WHERE payment_id = ?'
+        return cursor.execute(sql, args).fetchall()
+
+
+def select_payments_by_user_id_and_group_id(*args):
+    with conn:
+        sql = 'SELECT description, payment_id FROM payment WHERE user_id = ? AND group_id = ?'
         return cursor.execute(sql, args).fetchall()
 
 
@@ -111,5 +117,26 @@ def update_user_online(*args):
 def update_debt(*args):
     with conn:
         sql = 'UPDATE debt SET amount = amount + ? WHERE debt_id = ?'
+        cursor.execute(sql, args)
+        conn.commit()
+
+
+def update_bill_description(*args):
+    with conn:
+        sql = 'UPDATE payment SET description = ? WHERE payment_id = ?'
+        cursor.execute(sql, args)
+        conn.commit()
+
+
+def update_bill_amount(*args):
+    with conn:
+        sql = 'UPDATE payment SET amount = ? WHERE payment_id = ?'
+        cursor.execute(sql, args)
+        conn.commit()
+
+
+def update_history_debt(*args):
+    with conn:
+        sql = 'UPDATE history_debt SET amount = ? WHERE payment_id = ?'
         cursor.execute(sql, args)
         conn.commit()

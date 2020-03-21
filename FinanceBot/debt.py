@@ -88,6 +88,22 @@ def create_refund_bill(user_id, amount, debtor_id):
     bill.insert_payment(user_id)
 
 
+def update_debt(user_id, amount, payment_id):
+    data = db.select_debtors_by_payment_id(payment_id)
+    users = list(map(lambda d: d[0], data))
+    old_debt_amount = data[0][1]
+    new_debt_amount = round(amount / (len(users) + 1), 2)
+    res = new_debt_amount - old_debt_amount
+    for _id in users:
+        debt_data = db.select_debts(user_id, _id)[0]
+        if debt_data + res >= 0:
+            db.update_debt(res, user_id - _id)
+        else:
+            db.update_debt(-debt_data, user_id - _id)
+            db.insert_debt(_id - user_id, _id, (debt_data + res) * -1, user_id)
+    db.update_history_debt(new_debt_amount, payment_id)
+
+
 def get_debtors(user_id):
     debtors = db.select_debtors(user_id)
     msg = ''
@@ -102,29 +118,6 @@ def get_debts(user_id):
     for d in debts:
         msg = msg + d[0] + ' ' + d[1] + '<---' + str(d[2]) + '\n'
     return msg
-
-
-def debr_recalc(payment_id, user_id):
-    bill_obj = bill.get_bill(payment_id)
-    users = db.select_debtors_by_payment_id(payment_id)
-    amount = round(bill_obj.get_amount() / len(users) + 1, 2)
-    for _id in users:
-        data = db.select_debts(_id, user_id)
-        p_amount = amount
-        if data:
-            for debt in data:
-                if p_amount >= debt[1]:
-                    db.update_debt(0, debt[0], user_id)
-                    p_amount -= debt[1]
-                else:
-                    db.update_debt(debt[1] - p_amount, debt[0], user_id)
-                    p_amount = 0
-                    db.insert_debt(bill.get_data(user_id, 'payment_id'), _id, p_amount)
-                    break
-            if p_amount > 0:
-                db.insert_debt(bill.get_data(user_id, 'payment_id'), _id, p_amount)
-        else:
-            db.update_debt(debt[1] - p_amount, debt[0], user_id)
 
 
 def get_alert(users_id, message):
