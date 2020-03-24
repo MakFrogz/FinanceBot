@@ -1,6 +1,5 @@
 import db
 import uuid
-import group
 import user
 import datetime
 import debt
@@ -9,7 +8,7 @@ temp = {}
 
 
 def create_bill(user_id):
-    temp[user_id] = {'payment_id': str(uuid.uuid4()), 'group_id': user.get_current_group(user_id), 'selected': []}
+    temp[user_id] = {'payment_id': str(uuid.uuid4()), 'group_id': user.get_current_group(user_id)}
 
 
 def put_data(user_id, key, val):
@@ -43,11 +42,14 @@ def insert_payment(user_id):
 
 
 def get_bills_msg(user_id):
-    group_id = group.get_current_group(user_id)
-    l = [bill for bill in bills if bill.get_group_id() == group_id]
+    group_id = user.get_current_group(user_id)
+    bills = db.select_bills(group_id)
     msg = ""
-    for b in l:
-        msg = msg + str(b) + '\n'
+    for b in bills:
+        msg = msg + 'Оплатил:' + user.get_user_fullname(b[0]) + '\n' \
+                    'Описание:' + b[1] + '\n' \
+                    'Сумма:' + str(b[2]) + '\n' \
+                    'Дата:' + str(b[3]) + '\n\n'
     return msg
 
 

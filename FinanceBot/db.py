@@ -62,10 +62,10 @@ def select_groups():
         return cursor.execute(sql).fetchall()
 
 
-def select_bills():
+def select_bills(*args):
     with conn:
-        sql = 'SELECT payment_id, user_id, group_id, description, amount, date FROM payment ORDER BY date DESC'
-        return cursor.execute(sql)
+        sql = 'SELECT  user_id, description, amount, date FROM payment WHERE group_id = ? ORDER BY date DESC LIMIT 5'
+        return cursor.execute(sql, args).fetchall()
 
 
 def select_debts(*args):
@@ -83,15 +83,13 @@ def select_debtors_for_keyboard(*args):
 
 def select_debtors(*args):
     with conn:
-        sql = 'SELECT user.first_name, user.last_name, SUM(debt.amount) FROM user INNER JOIN debt ON user.user_id = debt.user_id ' \
-              'INNER JOIN payment ON debt.payment_id = payment.payment_id WHERE payment.user_id = ? AND debt.amount > 0 GROUP BY user.user_id'
+        sql = 'SELECT debtor_id, amount FROM debt WHERE user_id = ?'
         return cursor.execute(sql, args).fetchall()
 
 
 def select_user_debts(*args):
     with conn:
-        sql = 'SELECT user.first_name, user.last_name, SUM(debt.amount) FROM user INNER JOIN payment ON user.user_id = payment.user_id  ' \
-                'INNER JOIN debt ON payment.payment_id = debt.payment_id WHERE debt.user_id = ? AND debt.amount > 0 GROUP BY user.user_id'
+        sql = 'SELECT user_id, amount FROM debt WHERE debtor_id = ?'
         return cursor.execute(sql, args).fetchall()
 
 
@@ -107,6 +105,22 @@ def select_payments_by_user_id_and_group_id(*args):
         return cursor.execute(sql, args).fetchall()
 
 
+def select_bill_amount(*args):
+    with conn:
+        sql = 'SELECT amount FROM payment WHERE payment_id = ?'
+        return cursor.execute(sql, args).fetchone()
+
+
+def select_sum_history_debts(*args):
+    with conn:
+        sql = 'SELECT SUM(h.amount) FROM history_debt h INNER JOIN payment p ON h.payment_id = p.payment_id WHERE p.user_id = ? AND h.user_id = ?'
+        data = cursor.execute(sql, args).fetchone()
+        if data[0]:
+            return data[0]
+        else:
+            return 0
+
+
 def update_user_online(*args):
     with conn:
         sql = 'UPDATE history_groups SET online = ? WHERE group_id = ? AND user_id = ?'
@@ -117,6 +131,13 @@ def update_user_online(*args):
 def update_debt(*args):
     with conn:
         sql = 'UPDATE debt SET amount = amount + ? WHERE debt_id = ?'
+        cursor.execute(sql, args)
+        conn.commit()
+
+
+def e_update_debt(*args):
+    with conn:
+        sql = 'UPDATE debt SET amount = ? WHERE debt_id = ?'
         cursor.execute(sql, args)
         conn.commit()
 
@@ -137,6 +158,16 @@ def update_bill_amount(*args):
 
 def update_history_debt(*args):
     with conn:
-        sql = 'UPDATE history_debt SET amount = ? WHERE payment_id = ?'
-        cursor.execute(sql, args)
-        conn.commit()
+        if check_existing_history_debt(args[0], args[1]):
+            sql = 'UPDATE history_debt SET amount = ? WHERE payment_id = ?'
+            cursor.execute(sql, (args[2], args[0]))
+            conn.commit()
+        else:
+            insert_debt_to_history_debt(*args)
+
+
+def check_existing_history_debt(*args):
+    with conn:
+        sql = 'SELECT EXISTS(SELECT payment_id, user_id FROM history_debt WHERE payment_id = ? AND user_id = ?)'
+        print(cursor.execute(sql, args).fetchone())
+        return cursor.execute(sql, args).fetchone()[0]

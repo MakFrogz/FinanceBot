@@ -1,35 +1,11 @@
-import sqlite3
-
 import db
 import bill
 import user
 import group
+import alert
 
 debtors = {}
 
-
-# def calc_debs(user_id, users_id):
-#     bill.show_data(user_id)
-#     amount = round(bill.get_data(user_id, 'amount') / len(users_id), 2)
-#     bill.insert_payment(user_id)
-#     for _id in users_id:
-#         if not _id == user_id:
-#             data = db.select_debts(_id, user_id)
-#             p_amount = amount
-#             if data:
-#                 for debt in data:
-#                     if p_amount >= debt[1]:
-#                         db.update_debt(0, debt[0], user_id)
-#                         p_amount -= debt[1]
-#                     else:
-#                         db.update_debt(debt[1] - p_amount, debt[0], user_id)
-#                         p_amount = 0
-#                         db.insert_debt(bill.get_data(user_id, 'payment_id'), _id, p_amount)
-#                         break
-#                 if p_amount > 0:
-#                     db.insert_debt(bill.get_data(user_id, 'payment_id'), _id, p_amount)
-#             else:
-#                 db.insert_debt(bill.get_data(user_id, 'payment_id'), _id, amount)
 
 def calc_debs(user_id, status):
     group_id = user.get_current_group(user_id)
@@ -51,6 +27,7 @@ def calc_debs(user_id, status):
             else:
                 db.insert_debt(user_id - _id, user_id, debt_amount, _id)
             db.insert_debt_to_history_debt(bill.get_data(user_id, 'payment_id'), _id, debt_amount)
+        alert.send_debt_msg(user_id, _id, bill.get_data(user_id, 'description'), debt_amount)
     bill.insert_payment(user_id)
 
 
@@ -78,6 +55,7 @@ def refund(user_id, amount):
     create_refund_bill(user_id, amount, debtor_id)
     db.update_debt(-amount, user_id - debtor_id)
     db.insert_debt_to_history_debt(bill.get_data(user_id, 'payment_id'), debtor_id, - amount)
+    alert.send_approve_refund(user_id, debtor_id, amount)
     return msg
 
 
@@ -101,14 +79,30 @@ def update_debt(user_id, amount, payment_id):
         else:
             db.update_debt(-debt_data, user_id - _id)
             db.insert_debt(_id - user_id, _id, (debt_data + res) * -1, user_id)
-    db.update_history_debt(new_debt_amount, payment_id)
+        db.update_history_debt(payment_id, _id, new_debt_amount)
+
+
+def recalc_debts(user_id):
+    payment_id = bill.get_data(user_id, 'edit_payment_id')
+    bill_amount = db.select_bill_amount(payment_id)[0]
+    selected = bill.get_selected(user_id)
+    debt_amount = round(bill_amount / (len(selected) + 1), 2)
+    for _id in selected:
+        db.update_history_debt(payment_id, _id, debt_amount)
+        d_amount = db.select_sum_history_debts(user_id, _id)
+        m_amount = db.select_sum_history_debts(_id, user_id)
+        if m_amount - d_amount > 0:
+            db.e_update_debt(m_amount - d_amount, _id - user_id)
+        else:
+            db.e_update_debt(d_amount - m_amount, user_id - _id)
 
 
 def get_debtors(user_id):
-    debtors = db.select_debtors(user_id)
+    debtor_list = db.select_debtors(user_id)
     msg = ''
-    for debtor in debtors:
-        msg = msg + debtor[0] + ' ' + debtor[1] + '--->' + str(debtor[2]) + '\n'
+    for debtor in debtor_list:
+        msg = msg + 'Должник:' + user.get_user_fullname(debtor[0]) + '\n' \
+                    'Сумма:' + str(debtor[1]) + '\n\n'
     return msg
 
 
@@ -116,10 +110,6 @@ def get_debts(user_id):
     debts = db.select_user_debts(user_id)
     msg = ''
     for d in debts:
-        msg = msg + d[0] + ' ' + d[1] + '<---' + str(d[2]) + '\n'
+        msg = msg + 'Имя:' + user.get_user_fullname(d[0]) + '\n' \
+                    'Сумма:' + str(d[1]) + '\n\n'
     return msg
-
-
-def get_alert(users_id, message):
-    amount = round(bill.get_data(message.from_user.id, 'amount') / len(users_id), 2)
-    return message.from_user.first_name + ' ' + message.from_user.last_name + ' заплатил за тебя сумму ' + str(amount) + '('  + bill.get_data(message.from_user.id, 'description') + ')'

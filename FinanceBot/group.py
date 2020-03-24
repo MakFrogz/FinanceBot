@@ -65,6 +65,17 @@ def get_members_by_group_id(group_id):
     return groups_dict[group_id]['members']
 
 
+def get_group_info(user_id):
+    group_id = user.get_current_group(user_id)
+    data = groups_dict[group_id]
+    msg = 'Группа:' + group_id + '\n' \
+          'Пароль:' + data['password'] + '\n' \
+          'Участники: \n'
+    for member in data['members']:
+        msg = msg + user.get_user_fullname(member) + '\n'
+    return msg
+
+
 def get_data_from_db():
     data = db.select_groups()
     global groups_dict

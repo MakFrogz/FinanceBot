@@ -5,8 +5,10 @@ import group
 import user
 import bill
 import debt
+import alert
 
 bot = telebot.TeleBot(config.toker)
+alert.set_bot(bot)
 
 
 @bot.message_handler(commands=['start'])
@@ -27,7 +29,7 @@ def call_create_group(message):
 
 def process_group_name(message):
     if not group.check_group_existing(message.text):
-        group.set_temp(message.from_user.id,'group_id', message.text)
+        group.set_temp(message.from_user.id, 'group_id', message.text)
         bot.send_message(message.from_user.id, 'Введите пароль для группы:')
         bot.register_next_step_handler(message, process_group_password)
     else:
@@ -108,42 +110,37 @@ def process_amount(message):
 
 @bot.message_handler(func=lambda message: message.text == 'Выбрать людей из списка')
 def call_select_users(message):
-    bot.send_message(message.from_user.id, 'Выберите людей из списка:', reply_markup=keyboard.get_users_keyboard(message.from_user.id, 'p_'))
+    bill.put_data(message.from_user.id, 'selected', [])
+    bill.put_data(message.from_user.id, 'edit', 0)
+    bot.send_message(message.from_user.id, 'Выберите людей из списка:', reply_markup=keyboard.get_users_keyboard(message.from_user.id))
 
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('p_'))
+@bot.callback_query_handler(func=lambda call: call.data.startswith('u_'))
 def callback_select_users(call):
-    # bill.put_data(call.from_user.id, 'selected', int(call.data[2:]))
     bill.set_selected(call.from_user.id, int(call.data[2:]))
-    markup = keyboard.get_new_markup(call.message.json['reply_markup'], call.data, 'p_')
+    markup = keyboard.get_new_markup(call.message.json['reply_markup'], call.data)
     bot.edit_message_reply_markup(call.from_user.id, call.message.message_id, reply_markup=markup)
 
 
-@bot.callback_query_handler(func=lambda call: call.data == 'p_apply')
+@bot.callback_query_handler(func=lambda call: call.data == 'apply')
 def callback_apply(call):
-    debt.calc_debs(call.from_user.id, False)
-    # alert = debt.get_alert(users, call)
-    # for u in users:
-    #     if not u == call.from_user.id:
-    #         bot.send_message(u, alert)
+    if bill.get_data(call.from_user.id, 'edit'):
+        debt.recalc_debts(call.from_user.id)
+    else:
+        debt.calc_debs(call.from_user.id, False)
     bot.delete_message(call.from_user.id, call.message.message_id)
     bot.send_message(call.from_user.id, 'Чек внесён!', reply_markup=keyboard.get_bills_control_keyboard())
 
 
-@bot.callback_query_handler(func=lambda call: call.data == 'p_cancel')
+@bot.callback_query_handler(func=lambda call: call.data == 'cancel')
 def callback_cancel(call):
-    # bill.clear_data(call.from_user.id, 'selected')
     bill.clear_selected(call.from_user.id)
-    bot.edit_message_reply_markup(call.from_user.id, call.message.message_id, reply_markup=keyboard.get_users_keyboard(call.from_user.id, 'p_'))
+    bot.edit_message_reply_markup(call.from_user.id, call.message.message_id, reply_markup=keyboard.get_users_keyboard(call.from_user.id))
 
 
 @bot.message_handler(func=lambda message: message.text == 'Заплатить за всех')
 def call_pay_for_all(message):
     debt.calc_debs(message.from_user.id, True)
-    # alert = debt.get_alert(users, message)
-    # for u in users:
-    #     if not u == message.from_user.id:
-    #         bot.send_message(u,alert)
     bot.send_message(message.from_user.id, 'Чек внесён!', reply_markup=keyboard.get_bills_control_keyboard())
 
 
@@ -199,36 +196,10 @@ def process_edit_bill_amount(message):
 
 @bot.message_handler(func=lambda message: message.text == 'Редактировать список людей')
 def call_edit_bill_users(message):
-    bill.put_data(message.from_user.id, 'e_selected', [])
+    bill.put_data(message.from_user.id, 'selected', [])
+    bill.put_data(message.from_user.id, 'edit', 1)
     bot.send_message(message.from_user.id, 'Выберите людей из списка:',
-                     reply_markup=keyboard.get_users_keyboard(message.from_user.id, 'e_'))
-
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith('e_'))
-def callback_select_users(call):
-    l = bill.get_data(call.from_user.id, 'e_selected')
-    l.append(int(call.data[2:]))
-    bill.put_data(call.from_user.id, 'e_selected', l)
-    markup = keyboard.get_new_markup(call.message.json['reply_markup'], call.data, 'e_')
-    bot.edit_message_reply_markup(call.from_user.id, call.message.message_id, reply_markup=markup)
-
-
-@bot.callback_query_handler(func=lambda call: call.data == 'e_apply')
-def callback_apply(call):
-    debt.calc_debs(call.from_user.id, False)
-    # alert = debt.get_alert(users, call)
-    # for u in users:
-    #     if not u == call.from_user.id:
-    #         bot.send_message(u, alert)
-    bot.delete_message(call.from_user.id, call.message.message_id)
-    bot.send_message(call.from_user.id, 'Чек внесён!', reply_markup=keyboard.get_bills_control_keyboard())
-
-
-@bot.callback_query_handler(func=lambda call: call.data == 'e_cancel')
-def callback_cancel(call):
-    # bill.clear_data(call.from_user.id, 'selected')
-    bill.clear_selected(call.from_user.id)
-    bot.edit_message_reply_markup(call.from_user.id, call.message.message_id, reply_markup=keyboard.get_users_keyboard(call.from_user.id, 'e_'))
+                     reply_markup=keyboard.get_users_keyboard(message.from_user.id))
 
 
 @bot.message_handler(func=lambda message: message.text == 'Задолженности')
@@ -286,6 +257,15 @@ def call_leave_group(message):
 @bot.message_handler(func=lambda message: message.text == 'Назад')
 def call_back(message):
     bot.send_message(message.from_user.id, 'Выберите пункт меню:', reply_markup=keyboard.get_main_keyboard())
+
+
+@bot.message_handler(func=lambda message: message.text == 'Инф. о группе')
+def call_group_info(message):
+    try:
+        msg = group.get_group_info(message.from_user.id)
+        bot.send_message(message.from_user.id, msg)
+    except telebot.apihelper.ApiException:
+        bot.send_message(message.from_user.id, 'Уппссс! Нет информации о группе!')
 
 
 if __name__ == '__main__':
